@@ -1,0 +1,103 @@
+bash ./e2e-test.sh
+Starting E2E Tests for Movies API
+Target service: http://127.0.0.1:8080
+Timeout: 10s
+
+
+=== STAGE 1: Environment & Health Check ===
+[INFO] Checking required environment variables...
+[SUCCESS] Environment variables check completed
+[INFO] Testing health check endpoint...
+[INFO] Making GET request to /healthz
+[SUCCESS] Health check passed
+
+=== STAGE 2: Basic CRUD Operations ===
+[INFO] Creating movie 'Test Movie 1' (expecting no box office data due to upstream failure)...
+[INFO] Making POST request to /movies
+[SUCCESS] Movie created successfully with ID: 2025-11-19T07:15:28.432096575Z
+[SUCCESS] Box office field is correctly null when upstream fails
+[INFO] Creating movie 'Inception' (may have box office data)...
+[INFO] Making POST request to /movies
+[SUCCESS] Movie 'Inception' created successfully with ID: 2025-11-19T07:15:28.578767111Z
+[INFO] Note: Location header should be present in response
+[INFO] Testing movie listing...
+[INFO] Making GET request to /movies
+[SUCCESS] Movie listing returned 2 movies
+[SUCCESS] Movie response structure is correct
+
+=== STAGE 3: Rating System ===
+[INFO] Submitting new rating for 'Test Movie 1'...
+[INFO] Making POST request to /movies/Test Movie 1/ratings
+[SUCCESS] New rating submitted successfully (201)
+[INFO] Updating existing rating for 'Test Movie 1'...
+[INFO] Making POST request to /movies/Test Movie 1/ratings
+[SUCCESS] Rating updated successfully (Upsert semantics working)
+[INFO] Adding rating from different user...
+[INFO] Making POST request to /movies/Test Movie 1/ratings
+[SUCCESS] Second rating added successfully (201)
+[INFO] Testing rating aggregation for 'Test Movie 1'...
+[INFO] Making GET request to /movies/Test Movie 1/rating
+[SUCCESS] Rating count is correct: 2
+[SUCCESS] Average rating format is correct: 3.8
+[SUCCESS] Average calculation is correct: 3.8
+
+=== STAGE 4: Search and Pagination ===
+[INFO] Testing keyword search with 'q=Test'...
+[INFO] Making GET request to /movies?q=Test
+[SUCCESS] Keyword search returned 1 results
+[INFO] Testing year filter with 'year=2010'...
+[INFO] Making GET request to /movies?year=2010
+[SUCCESS] Year filter returned 1 results
+[SUCCESS] All results are from year 2010
+[INFO] Testing genre filter with 'genre=Sci-Fi'...
+[INFO] Making GET request to /movies?genre=Sci-Fi
+[SUCCESS] Genre filter returned 1 results
+[INFO] Testing pagination with limit=1...
+[INFO] Making GET request to /movies?limit=1
+[SUCCESS] Limit parameter working correctly
+[SUCCESS] Next cursor provided: 2025-11-19T07:15:28.578767111Z
+[INFO] Testing next page with cursor...
+[INFO] Making GET request to /movies?limit=1&cursor=2025-11-19T07%3A15%3A28.578767111Z
+[SUCCESS] Cursor-based pagination working
+
+=== STAGE 5: Authentication and Permissions ===
+[INFO] Testing movie creation without Bearer token (expecting 401)...
+[INFO] Making POST request to /movies
+[SUCCESS] Correctly returned 401 for missing Bearer token
+[INFO] Testing movie creation with invalid Bearer token...
+[INFO] Making POST request to /movies
+[SUCCESS] Correctly returned 401 for invalid Bearer token
+[INFO] Testing rating submission without X-Rater-Id (expecting 401)...
+[INFO] Making POST request to /movies/Test Movie 1/ratings
+[SUCCESS] Correctly returned 401 for missing X-Rater-Id
+[INFO] Testing rating submission with empty X-Rater-Id (expecting 401)...
+[INFO] Making POST request to /movies/Test Movie 1/ratings
+[SUCCESS] Correctly returned 401 for empty X-Rater-Id
+
+=== STAGE 6: Error Handling and Edge Cases ===
+[INFO] Testing rating aggregation for non-existent movie (expecting 404)...
+[INFO] Making GET request to /movies/NonExistentMovie/rating
+[SUCCESS] Correctly returned 404 for non-existent movie rating
+[INFO] Testing rating submission for non-existent movie (expecting 404)...
+[INFO] Making POST request to /movies/NonExistentMovie/ratings
+[SUCCESS] Correctly returned 404 for rating submission to non-existent movie
+[INFO] Testing invalid rating value (expecting 422)...
+[INFO] Making POST request to /movies/Test Movie 1/ratings
+[SUCCESS] Correctly returned 422 for invalid rating value
+[INFO] Making POST request to /movies/Test Movie 1/ratings
+[SUCCESS] Correctly returned 422 for invalid rating step
+[INFO] Testing movie creation with missing title (expecting 422)...
+[INFO] Making POST request to /movies
+[SUCCESS] Correctly returned 422 for missing title
+[INFO] Testing movie creation with invalid date format (expecting 422)...
+[INFO] Making POST request to /movies
+[SUCCESS] Correctly returned 422 for invalid date format
+[INFO] Testing invalid JSON in request body (expecting 422)...
+[INFO] Making POST request to /movies
+[SUCCESS] Correctly returned 422 for invalid JSON
+
+=== TEST SUMMARY ===
+Tests passed: 31
+Tests failed: 0
+
+🎉 All tests passed!

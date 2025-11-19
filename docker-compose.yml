@@ -1,0 +1,21 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: robin-camp:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - ADDRESS=0.0.0.0
+      - AUTH_TOKEN=TOKEN
+      - DB_URL=file:/data/movies.db?_foreign_keys=on
+      - BOXOFFICE_URL=https://m1.apifoxmock.com/m1/7149601-6873494-default
+      - BOXOFFICE_API_KEY=0B4nmUwMPBphsKDr_u9HX
+    volumes:
+      - movies-data:/data
+    restart: unless-stopped
+
+volumes:
+  movies-data:

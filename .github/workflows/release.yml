@@ -1,0 +1,126 @@
+name: Go Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"  # 仅在语义化 tag（例如 v1.2.3）时触发
+
+permissions:
+  contents: write  # 需要写权限以创建/更新 GitHub Release
+
+env:
+  GO_VERSION: "1.25.4"        # 根据项目实际 Go 版本可调整
+  BINARY_NAME: "Robin-Camp"   # 生成的二进制基础名称
+  VERSION: "${{ github.ref_name }}"  # 当前 tag 名称，例如 v1.2.3
+
+jobs:
+  build:
+    name: Build binaries
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          # 如需精简平台或暂不支持的组合可在此排除
+          # - goos: darwin
+          #   goarch: arm64
+          []
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+          cache: true
+
+      - name: Show Go env
+        run: |
+          go version
+          echo "Ref: ${{ github.ref }}"
+          echo "Tag: ${{ github.ref_name }}"
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Create dist directory
+        run: mkdir -p dist
+
+      - name: Build for ${{ matrix.goos }}-${{ matrix.goarch }}
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          EXT=""
+          if [ "${GOOS}" = "windows" ]; then
+            EXT=".exe"
+          fi
+
+          OUT_NAME="${BINARY_NAME}_${VERSION}_${GOOS}_${GOARCH}"
+          OUT_FILE="dist/${OUT_NAME}${EXT}"
+
+          echo "Building ${OUT_FILE}"
+
+          # 如果代码中有版本变量，请根据实际路径调整 main.version
+          go build \
+            -ldflags "-s -w -X main.version=${VERSION}" \
+            -o "${OUT_FILE}" \
+            ./
+
+          echo "Built ${OUT_FILE}"
+
+      - name: Package artifact for ${{ matrix.goos }}-${{ matrix.goarch }}
+        run: |
+          cd dist
+          OUT_NAME="${BINARY_NAME}_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
+
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            ARCHIVE_NAME="${OUT_NAME}.zip"
+            echo "Creating ${ARCHIVE_NAME}"
+            zip "${ARCHIVE_NAME}" "${OUT_NAME}.exe"
+          else
+            ARCHIVE_NAME="${OUT_NAME}.tar.gz"
+            echo "Creating ${ARCHIVE_NAME}"
+            tar -czf "${ARCHIVE_NAME}" "${OUT_NAME}"
+          fi
+
+      - name: Upload artifact ${{ matrix.goos }}-${{ matrix.goarch }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: "Robin-Camp-${{ matrix.goos }}-${{ matrix.goarch }}"
+          path: |
+            dist/Robin-Camp_${{ env.VERSION }}_${{ matrix.goos }}_${{ matrix.goarch }}*.zip
+            dist/Robin-Camp_${{ env.VERSION }}_${{ matrix.goos }}_${{ matrix.goarch }}*.tar.gz
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Show downloaded files
+        run: |
+          echo "Artifacts in dist/:"
+          ls -R dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Robin-Camp ${{ env.VERSION }}"
+          files: |
+            dist/**
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

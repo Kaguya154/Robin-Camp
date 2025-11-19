@@ -1,0 +1,269 @@
+definitions:
+  internal.BoxOffice:
+    properties:
+      currency:
+        type: string
+      lastUpdated:
+        type: string
+      revenue:
+        $ref: '#/definitions/internal.Revenue'
+      source:
+        type: string
+    type: object
+  internal.Error:
+    properties:
+      code:
+        type: string
+      details: {}
+      message:
+        type: string
+    type: object
+  internal.Movie:
+    properties:
+      boxOffice:
+        $ref: '#/definitions/internal.BoxOffice'
+      budget:
+        type: integer
+      distributor:
+        type: string
+      genre:
+        type: string
+      id:
+        type: string
+      mpaRating:
+        type: string
+      releaseDate:
+        type: string
+      title:
+        type: string
+    type: object
+  internal.MovieCreate:
+    properties:
+      budget:
+        type: integer
+      distributor:
+        type: string
+      genre:
+        type: string
+      mpaRating:
+        type: string
+      releaseDate:
+        type: string
+      title:
+        type: string
+    type: object
+  internal.MoviePage:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/internal.Movie'
+        type: array
+      nextCursor:
+        type: string
+    type: object
+  internal.RatingAggregate:
+    properties:
+      average:
+        type: number
+      count:
+        type: integer
+    type: object
+  internal.RatingResult:
+    properties:
+      movieTitle:
+        type: string
+      raterId:
+        type: string
+      rating:
+        type: number
+    type: object
+  internal.RatingSubmit:
+    properties:
+      rating:
+        type: number
+    type: object
+  internal.Revenue:
+    properties:
+      openingWeekendUSA:
+        type: integer
+      worldwide:
+        type: integer
+    type: object
+info:
+  contact: {}
+paths:
+  /movies:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of movies, optionally filtered by query,
+        year, genre and cursor.
+      parameters:
+      - description: Search query for movie title substring
+        in: query
+        name: q
+        type: string
+      - description: Release year (YYYY) derived from releaseDate
+        in: query
+        name: year
+        type: string
+      - description: Exact genre filter
+        in: query
+        name: genre
+        type: string
+      - description: Maximum number of items to return (default 20)
+        in: query
+        name: limit
+        type: integer
+      - description: Pagination cursor from previous page's nextCursor
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal.MoviePage'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal.Error'
+      summary: List and search movies
+      tags:
+      - Movies
+    post:
+      consumes:
+      - application/json
+      description: Creates a new movie and synchronously enriches it with box office
+        data when available.
+      parameters:
+      - description: Movie to create
+        in: body
+        name: movie
+        required: true
+        schema:
+          $ref: '#/definitions/internal.MovieCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              description: Location of the newly created movie resource
+              type: string
+          schema:
+            $ref: '#/definitions/internal.Movie'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/internal.Error'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.Error'
+        "422":
+          description: Unprocessable entity (validation or invalid JSON)
+          schema:
+            $ref: '#/definitions/internal.Error'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal.Error'
+      security:
+      - BearerAuth: []
+      summary: Create a new movie
+      tags:
+      - Movies
+  /movies/{title}/rating:
+    get:
+      consumes:
+      - application/json
+      description: Returns the average rating (rounded to one decimal) and count of
+        ratings for the given movie.
+      parameters:
+      - description: Movie title
+        in: path
+        name: title
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal.RatingAggregate'
+        "404":
+          description: Movie not found or no ratings yet
+          schema:
+            $ref: '#/definitions/internal.Error'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal.Error'
+      summary: Get rating aggregate for a movie
+      tags:
+      - Ratings
+  /movies/{title}/ratings:
+    post:
+      consumes:
+      - application/json
+      description: Submits a rating for the given movie title. If the rater has already
+        rated this movie, the rating is updated.
+      parameters:
+      - description: Movie title
+        in: path
+        name: title
+        required: true
+        type: string
+      - description: Unique rater identifier
+        in: header
+        name: X-Rater-Id
+        required: true
+        type: string
+      - description: Rating payload (0.5-5.0 in 0.5 steps)
+        in: body
+        name: rating
+        required: true
+        schema:
+          $ref: '#/definitions/internal.RatingSubmit'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Rating updated
+          schema:
+            $ref: '#/definitions/internal.RatingResult'
+        "201":
+          description: Rating created
+          headers:
+            Location:
+              description: Location of the rating resource when created
+              type: string
+          schema:
+            $ref: '#/definitions/internal.RatingResult'
+        "400":
+          description: Bad request (invalid body or rating)
+          schema:
+            $ref: '#/definitions/internal.Error'
+        "401":
+          description: Unauthorized (missing or invalid X-Rater-Id)
+          schema:
+            $ref: '#/definitions/internal.Error'
+        "404":
+          description: Movie not found
+          schema:
+            $ref: '#/definitions/internal.Error'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal.Error'
+      security:
+      - RaterId: []
+      summary: Submit or update a rating for a movie
+      tags:
+      - Ratings
+swagger: "2.0"

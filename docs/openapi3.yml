@@ -1,0 +1,301 @@
+components:
+  schemas:
+    internal.BoxOffice:
+      properties:
+        currency:
+          type: string
+        lastUpdated:
+          type: string
+        revenue:
+          $ref: '#/components/schemas/internal.Revenue'
+        source:
+          type: string
+      type: object
+    internal.Error:
+      properties:
+        code:
+          type: string
+        details: {}
+        message:
+          type: string
+      type: object
+    internal.Movie:
+      properties:
+        boxOffice:
+          $ref: '#/components/schemas/internal.BoxOffice'
+        budget:
+          type: integer
+        distributor:
+          type: string
+        genre:
+          type: string
+        id:
+          type: string
+        mpaRating:
+          type: string
+        releaseDate:
+          type: string
+        title:
+          type: string
+      type: object
+    internal.MovieCreate:
+      properties:
+        budget:
+          type: integer
+        distributor:
+          type: string
+        genre:
+          type: string
+        mpaRating:
+          type: string
+        releaseDate:
+          type: string
+        title:
+          type: string
+      type: object
+    internal.MoviePage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/internal.Movie'
+          type: array
+        nextCursor:
+          type: string
+      type: object
+    internal.RatingAggregate:
+      properties:
+        average:
+          type: number
+        count:
+          type: integer
+      type: object
+    internal.RatingResult:
+      properties:
+        movieTitle:
+          type: string
+        raterId:
+          type: string
+        rating:
+          type: number
+      type: object
+    internal.RatingSubmit:
+      properties:
+        rating:
+          type: number
+      type: object
+    internal.Revenue:
+      properties:
+        openingWeekendUSA:
+          type: integer
+        worldwide:
+          type: integer
+      type: object
+info:
+  contact: {}
+  title: ""
+  version: ""
+openapi: 3.0.3
+paths:
+  /movies:
+    get:
+      description: Returns a paginated list of movies, optionally filtered by query,
+        year, genre and cursor.
+      parameters:
+      - description: Search query for movie title substring
+        in: query
+        name: q
+        schema:
+          type: string
+      - description: Release year (YYYY) derived from releaseDate
+        in: query
+        name: year
+        schema:
+          type: string
+      - description: Exact genre filter
+        in: query
+        name: genre
+        schema:
+          type: string
+      - description: Maximum number of items to return (default 20)
+        in: query
+        name: limit
+        schema:
+          type: integer
+      - description: Pagination cursor from previous page's nextCursor
+        in: query
+        name: cursor
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.MoviePage'
+          description: OK
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.Error'
+          description: Internal server error
+      summary: List and search movies
+      tags:
+      - Movies
+    post:
+      description: Creates a new movie and synchronously enriches it with box office
+        data when available.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/internal.MovieCreate'
+        description: Movie to create
+        required: true
+        x-originalParamName: movie
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.Movie'
+          description: Created
+          headers:
+            Location:
+              description: Location of the newly created movie resource
+              schema:
+                type: string
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.Error'
+          description: Bad request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.Error'
+          description: Unauthorized
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.Error'
+          description: Unprocessable entity (validation or invalid JSON)
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.Error'
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Create a new movie
+      tags:
+      - Movies
+  /movies/{title}/rating:
+    get:
+      description: Returns the average rating (rounded to one decimal) and count of
+        ratings for the given movie.
+      parameters:
+      - description: Movie title
+        in: path
+        name: title
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.RatingAggregate'
+          description: OK
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.Error'
+          description: Movie not found or no ratings yet
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.Error'
+          description: Internal server error
+      summary: Get rating aggregate for a movie
+      tags:
+      - Ratings
+  /movies/{title}/ratings:
+    post:
+      description: Submits a rating for the given movie title. If the rater has already
+        rated this movie, the rating is updated.
+      parameters:
+      - description: Movie title
+        in: path
+        name: title
+        required: true
+        schema:
+          type: string
+      - description: Unique rater identifier
+        in: header
+        name: X-Rater-Id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/internal.RatingSubmit'
+        description: Rating payload (0.5-5.0 in 0.5 steps)
+        required: true
+        x-originalParamName: rating
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.RatingResult'
+          description: Rating updated
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.RatingResult'
+          description: Rating created
+          headers:
+            Location:
+              description: Location of the rating resource when created
+              schema:
+                type: string
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.Error'
+          description: Bad request (invalid body or rating)
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.Error'
+          description: Unauthorized (missing or invalid X-Rater-Id)
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.Error'
+          description: Movie not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/internal.Error'
+          description: Internal server error
+      security:
+      - RaterId: []
+      summary: Submit or update a rating for a movie
+      tags:
+      - Ratings
